@@ -202,16 +202,15 @@ class Query:
         response = ""
         user = username.lower()
         try:
-            with self.conn:
-                if(initAmount >= 0):
-                    self.conn.cursor().execute(self.CREATE_CUSTOMER_SQL.format(user, password, initAmount))
-                    response = "Created user {}\n".format(user)
-                else:
-                    response = "Failed to create user\n"
-        except Exception as e: # apsw.ConstraintError:
+            if(initAmount >= 0):
+                self.conn.cursor().execute(self.CREATE_CUSTOMER_SQL.format(user, password, initAmount))
+                response = "Created user {}\n".format(user)
+            else:
+                response = "Failed to create user\n"
+        except apsw.ConstraintError:
             #we already have this customer. we can not create it again
             #print("create user meets apsw.ConstraintError")
-            response = "Failed to create user, error: {} ******** {}\n".format(e, e.__traceback__)
+            response = "Failed to create user\n"
         return response
 
     '''
@@ -293,6 +292,7 @@ class Query:
                 for f in result: 
                     self.lastItineraries.append(Itinerary(f[14], Flight(f[0], f[2], f[4], f[5], f[6], f[8], f[14], f[16], f[17])))
                 
+                # get indirect flights if requested & needed
                 if not directFlight and len(self.lastItineraries) < numberOfItineraries:
                     # get indirect flights 
                     result = self.conn.cursor().execute("""
@@ -368,21 +368,22 @@ class Query:
                         response = "You cannot book two flights in the same day\n"
                     else:
                         for i in range(itinerary.numFlights()):
-                            result = self.conn.cursor().execute("""
+                            cap = self.conn.cursor().execute("""
                                 SELECT capacity
                                 FROM Flights AS f
                                 WHERE f.fid = {}
-                            ;""".format(itinerary.flights[i].fid)).fetchone()
-                            if result[0] > 0:
-                                # update flight capacities
-                                self.conn.cursor().execute("""
-                                    UPDATE Flights 
-                                    SET capacity = capacity - 1
-                                    WHERE fid = {}
-                                ;""".format(itinerary.flights[i].fid))
-                            else:
+                            ;""".format(itinerary.flights[i].fid)).fetchone()[0]
+                            num_rsvns = self.conn.cursor().execute("""
+                                SELECT COUNT(*) 
+                                FROM Reservations
+                                WHERE (fid1 = {}
+                                    OR fid2 = {})
+                                    AND canceled = 0
+                            ;""".format(itinerary.flights[i].fid, itinerary.flights[i].fid)).fetchone()[0]
+
+                            if num_rsvns >= cap:
                                 return "Booking failed\n"
-                    
+
                         # make reservation
                         res_id = self.conn.cursor().execute("""
                             SELECT *
@@ -399,6 +400,7 @@ class Query:
                         response = "Booked flight(s), reservation ID: {}\n".format(res_id)
             except:
                 response = "Booking failed\n"
+
         return response
 
 
@@ -420,8 +422,48 @@ class Query:
    *         [balance]\n" where [balance] is the remaining balance in the user's account.
     '''
     def transactionPay(self, reservationId):
-        #TODO your code here
         response = ""
+        if self.username == None: 
+            return "Cannot pay, not logged in\n"
+        try:
+            with self.conn:
+                # check if reservation is valid & belongs to logged in user
+                result = self.conn.cursor().execute("""
+                    SELECT r.username, r.price, r.paid
+                    FROM Reservations AS r
+                    WHERE r.rid = {}
+                ;""".format(reservationId)).fetchone()
+                if not result or result[0] != self.username or result[2]:
+                    return "Cannot find unpaid reservation {} under user: {}\n".format(reservationId, self.username)
+                
+                price = result[1]
+                # check if user has enough money to pay
+                balance = self.conn.cursor().execute("""
+                    SELECT c.balance
+                    FROM Customers AS c
+                    WHERE c.username = '{}'
+                ;""".format(self.username)).fetchone()[0]
+                if balance < price:
+                    return "User has only {} in account but itinerary costs {}\n".format(balance, price)
+                
+                # update customer balance
+                self.conn.cursor().execute("""
+                    UPDATE Customers
+                    SET balance = {}
+                    WHERE username = '{}'
+                ;""".format(balance - price, self.username))
+
+                # mark reservation as paid
+                self.conn.cursor().execute("""
+                    UPDATE Reservations
+                    SET paid = 1
+                    WHERE rid = {}
+                ;""".format(reservationId))
+
+                response = "Paid reservation: {} remaining balance: {}\n".format(reservationId, balance - price)
+        except:
+            response = "Failed to pay for reservation {}\n".format(reservationId)
+
         return response
                 
     '''
@@ -443,9 +485,36 @@ class Query:
    * @see Flight#toString()
     '''
     def transactionReservation(self):
-        #TODO your code here
+        if self.username == None:
+            return "Cannot view reservations, not logged in\n"
+
         response = ""
-        
+        try:
+            with self.conn:
+                result = self.conn.cursor().execute("""
+                    SELECT rid, paid, fid1, fid2
+                    FROM Reservations 
+                    WHERE username = '{}'
+                ;""".format(self.username)).fetchall()
+                
+                if not result:
+                    return "No reservations found\n"
+
+                for rsvn in result:
+                    paid = "true" if rsvn[1] else "false"
+                    response += "Reservation {} paid: {}:\n".format(rsvn[0], paid)
+                    for fid in rsvn[2:]:
+                        if fid != -1:
+                            f = self.conn.cursor().execute("""
+                                SELECT * 
+                                FROM Flights 
+                                WHERE fid = {}
+                            ;""".format(fid)).fetchone()
+                            flight = Flight(f[0], f[2], f[4], f[5], f[6], f[8], f[14], f[16], f[17])
+                            response += flight.toString()
+        except:
+            return "Failed to retrieve reservations\n"
+
         return response
 
     '''
@@ -461,10 +530,28 @@ class Query:
    *         Even though a reservation has been canceled, its ID should not be reused by the system.
     '''
     def transactionCancel(self, reservationId):
-        #TODO your code here
-        response = ""
-        
-        return response
+        if self.username == None:
+            return "Cannot cancel reservations, not logged in\n"
+        try: 
+            with self.conn:
+                username = self.conn.cursor().execute("""
+                    SELECT username
+                    FROM Reservations
+                    WHERE rid = {}
+                        AND canceled = 0
+                ;""".format(reservationId)).fetchone()[0]
+                # print("----USERNAME = {}".format(username))
+                if username != self.username:
+                    return "Failed to cancel reservation {}\n".format(reservationId)
+                
+                self.conn.cursor().execute("""
+                    UPDATE Reservations
+                    SET canceled = 1
+                    WHERE rid = {}
+                ;""".format(reservationId))
+                return "Canceled reservation {}\n".format(reservationId)
+        except:
+            return "Failed to cancel reservation {}\n".format(reservationId)
 
 
     '''

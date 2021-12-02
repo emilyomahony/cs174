@@ -127,3 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# temp testcase folders
+tests_concurrent/
+tests_non_concurrent
+
+# database stuff
+example.db 
+flights-small.csv
