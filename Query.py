@@ -356,50 +356,58 @@ class Query:
             response = "No such itinerary {}\n".format(itineraryId)
         else:
             itinerary = self.lastItineraries[itineraryId]
-            try: 
-                with self.conn:
-                    result = self.conn.cursor().execute("""
-                        SELECT * 
-                        FROM Reservations
-                        WHERE username = '{}'
-                            AND day_of_month = {}
-                    ;""".format(self.username, itinerary.flights[0].dayOfMonth)).fetchall()
-                    if result:
-                        response = "You cannot book two flights in the same day\n"
-                    else:
-                        for i in range(itinerary.numFlights()):
-                            cap = self.conn.cursor().execute("""
-                                SELECT capacity
-                                FROM Flights AS f
-                                WHERE f.fid = {}
-                            ;""".format(itinerary.flights[i].fid)).fetchone()[0]
-                            num_rsvns = self.conn.cursor().execute("""
-                                SELECT COUNT(*) 
-                                FROM Reservations
-                                WHERE (fid1 = {}
-                                    OR fid2 = {})
-                                    AND canceled = 0
-                            ;""".format(itinerary.flights[i].fid, itinerary.flights[i].fid)).fetchone()[0]
+            while (True):
+                try: 
+                    with self.conn:
+                        result = self.conn.cursor().execute("""
+                            SELECT * 
+                            FROM Reservations
+                            WHERE username = '{}'
+                                AND day_of_month = {}
+                        ;""".format(self.username, itinerary.flights[0].dayOfMonth)).fetchall()
+                        # print("------------PRINTING--------------")
+                        # print("result: {}\ndayofmonth: {}\n".format(result, itinerary.flights[0].dayOfMonth))
+                        if result:
+                            response = "You cannot book two flights in the same day\n"
+                            break
+                        else:
+                            for i in range(itinerary.numFlights()):
+                                cap = self.conn.cursor().execute("""
+                                    SELECT capacity
+                                    FROM Flights AS f
+                                    WHERE f.fid = {}
+                                ;""".format(itinerary.flights[i].fid)).fetchone()[0]
+                                num_rsvns = self.conn.cursor().execute("""
+                                    SELECT COUNT(*) 
+                                    FROM Reservations
+                                    WHERE (fid1 = {}
+                                        OR fid2 = {})
+                                        AND canceled = 0
+                                ;""".format(itinerary.flights[i].fid, itinerary.flights[i].fid)).fetchone()[0]
 
-                            if num_rsvns >= cap:
-                                return "Booking failed\n"
+                                if num_rsvns >= cap:
+                                    return "Booking failed\n"
+                                    break
 
-                        # make reservation
-                        res_id = self.conn.cursor().execute("""
-                            SELECT *
-                            FROM ReservationsId
-                        ;""").fetchone()[0]
-                        self.conn.cursor().execute("""
-                            UPDATE ReservationsId 
-                            SET rid = {}
-                        ;""".format(res_id + 1))
-                        self.conn.cursor().execute("""
-                            INSERT INTO Reservations VALUES ({},{},{},{},{},{},'{}',{})
-                        ;""".format(res_id, itinerary.itineraryPrice(), itinerary.flights[0].fid, 
-                            itinerary.flights[1].fid, 0, 0, self.username, itinerary.flights[0].dayOfMonth))
-                        response = "Booked flight(s), reservation ID: {}\n".format(res_id)
-            except:
-                response = "Booking failed\n"
+                            # make reservation
+                            res_id = self.conn.cursor().execute("""
+                                SELECT *
+                                FROM ReservationsId
+                            ;""").fetchone()[0]
+                            self.conn.cursor().execute("""
+                                UPDATE ReservationsId 
+                                SET rid = {}
+                            ;""".format(res_id + 1))
+                            self.conn.cursor().execute("""
+                                INSERT INTO Reservations VALUES ({},{},{},{},{},{},'{}',{})
+                            ;""".format(res_id, itinerary.itineraryPrice(), itinerary.flights[0].fid, 
+                                itinerary.flights[1].fid, 0, 0, self.username, itinerary.flights[0].dayOfMonth))
+                            response = "Booked flight(s), reservation ID: {}\n".format(res_id)
+                            break
+                except apsw.BusyError:
+                    continue
+                except:
+                    return "Booking failed\n"
 
         return response
 

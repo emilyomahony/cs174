@@ -1,0 +1,97 @@
+# Two terminals attempt to create user1 then book the same flight. One of the two
+# terminals will succeed in user creation, both should succeed in logging in.
+# one terminal should succeed booking the flight, the other should fail with "You cannot book two flights in the same day"
+# Terminal 1
+create user1 user1 10000
+login user1 user1
+search "Boston MA" "Los Angeles CA" 1 3 2
+book 0
+quit
+*
+# Terminal 1 succeeds in user creation and booking
+Created user user1
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+Booked flight(s), reservation ID: 1
+Goodbye
+|
+# Terminal 1 succeeds in user creation, but fails booking
+Created user user1
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+You cannot book two flights in the same day
+Goodbye
+|
+# Terminal 1 fails to create user as Terminal 2 already has, but succeeds booking
+Failed to create user
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+Booked flight(s), reservation ID: 1
+Goodbye
+|
+# Terminal 1 fails to create user as Terminal 2 already has, and fails booking
+Failed to create user
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+You cannot book two flights in the same day
+Goodbye
+*
+# Terminal 2
+create user1 user1 10000
+login user1 user1
+search "Boston MA" "Los Angeles CA" 1 3 2
+book 0
+quit
+*
+# Terminal 2 fails in user creation and booking
+Failed to create user
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+You cannot book two flights in the same day
+Goodbye
+|
+# Terminal 2 fails in user creation, but succeeds booking
+Failed to create user
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+Booked flight(s), reservation ID: 1
+Goodbye
+|
+# Terminal 2 succeeds in user creation, but fails booking
+Created user user1
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+You cannot book two flights in the same day
+Goodbye
+|
+# Terminal 2 succeeds in user creation and booking
+Created user user1
+Logged in as user1
+Itinerary 0: 1 flight(s), 345 minutes
+ID: 719059 Day: 3 Carrier: B6 Number: 687 Origin: Boston MA Dest: Los Angeles CA Duration: 345 Capacity: 1 Price: 609
+Itinerary 1: 1 flight(s), 349 minutes
+ID: 718966 Day: 3 Carrier: B6 Number: 487 Origin: Boston MA Dest: Los Angeles CA Duration: 349 Capacity: 3 Price: 689
+Booked flight(s), reservation ID: 1
+Goodbye
+*

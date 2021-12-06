@@ -1,5 +1,4 @@
-# Two terminals attempt to create user1 then book a flight. One of the two
-# terminals will succeed in user creation, both should succeed in logging in.
+# user1 attempt to book a flight with search from other terminal. 
 # Terminal 1
 create user1 user1 10000
 login user1 user1
